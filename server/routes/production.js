@@ -74,4 +74,19 @@ router.get('/stats', (req, res) => {
   });
 });
 
+// Reset daily production data
+router.delete('/reset', (req, res) => {
+  const { date } = req.query;
+  if (!date) {
+    return res.status(400).json({ error: 'date is required' });
+  }
+
+  try {
+    const result = db.prepare('DELETE FROM production WHERE date = ?').run(date);
+    res.json({ success: true, deleted: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset production data' });
+  }
+});
+
 module.exports = router;
