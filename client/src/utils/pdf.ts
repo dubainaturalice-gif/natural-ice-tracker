@@ -22,26 +22,22 @@ function teamLabel(team: number): string {
 
 function addCompactHeader(doc: jsPDF, title: string, subtitle: string): number {
   const w = doc.internal.pageSize.getWidth();
-  // Compact blue header bar
   doc.setFillColor(...PRIMARY_COLOR);
-  doc.rect(0, 0, w, 18, 'F');
-  // Green accent line
+  doc.rect(0, 0, w, 16, 'F');
   doc.setFillColor(...GREEN_COLOR);
-  doc.rect(0, 18, w, 2, 'F');
+  doc.rect(0, 16, w, 1.5, 'F');
 
-  // Title
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('Natural Ice Production Tracker', 10, 8);
+  doc.text('Natural Ice Production Tracker', 10, 7);
 
-  // Subtitle line
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${title}  —  ${subtitle}`, 10, 15);
+  doc.text(`${title}  —  ${subtitle}`, 10, 13);
 
   doc.setTextColor(0, 0, 0);
-  return 24; // y after header
+  return 21;
 }
 
 function addFooter(doc: jsPDF) {
@@ -53,14 +49,50 @@ function addFooter(doc: jsPDF) {
 
     doc.setDrawColor(...PRIMARY_COLOR);
     doc.setLineWidth(0.3);
-    doc.line(10, pageHeight - 10, pageWidth - 10, pageHeight - 10);
+    doc.line(10, pageHeight - 8, pageWidth - 10, pageHeight - 8);
 
-    doc.setFontSize(6.5);
+    doc.setFontSize(5.5);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 10, pageHeight - 6);
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 10, pageHeight - 6, { align: 'right' });
-    doc.text('Natural Ice Production Tracker', pageWidth / 2, pageHeight - 6, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 10, pageHeight - 5);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 10, pageHeight - 5, { align: 'right' });
+    doc.text('Natural Ice Production Tracker', pageWidth / 2, pageHeight - 5, { align: 'center' });
   }
+}
+
+// Flatten materials categories into rows
+function buildMatRows(categories: { name: string; items: string[] }[], materials: Record<string, { initial: number; using: number }>): (string | number)[][] {
+  const rows: (string | number)[][] = [];
+  for (const cat of categories) {
+    rows.push([cat.name, '', '', '']);
+    for (const item of cat.items) {
+      const mat = materials[item] || { initial: 0, using: 0 };
+      const final_val = mat.initial - mat.using;
+      rows.push([`  ${item}`, mat.initial, mat.using, final_val]);
+    }
+  }
+  return rows;
+}
+
+// Build 2-column materials table (8 cols: left 4 + right 4) for compact layout
+function buildTwoColMatRows(categories: { name: string; items: string[] }[], materials: Record<string, { initial: number; using: number }>): (string | number)[][] {
+  const flatRows = buildMatRows(categories, materials);
+  const midPoint = Math.ceil(flatRows.length / 2);
+  const leftRows = flatRows.slice(0, midPoint);
+  const rightRows = flatRows.slice(midPoint);
+
+  const combined: (string | number)[][] = [];
+  const maxLen = Math.max(leftRows.length, rightRows.length);
+  for (let i = 0; i < maxLen; i++) {
+    const left = leftRows[i] || ['', '', '', ''];
+    const right = rightRows[i] || ['', '', '', ''];
+    combined.push([...left, ...right]);
+  }
+  return combined;
+}
+
+// Check if a row-half is a category header (cols 1,2,3 are empty strings)
+function isCategoryRow(vals: (string | number)[]): boolean {
+  return vals[1] === '' && vals[2] === '' && vals[3] === '';
 }
 
 // ============================
@@ -84,11 +116,11 @@ export function generateDailyPDF(
   let y = addCompactHeader(doc, 'Daily Production Report', subtitle);
 
   // --- Production Table ---
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...PRIMARY_COLOR);
   doc.text('Production Data', 10, y);
-  y += 3;
+  y += 2.5;
 
   const prodHeaders = ['Product', ...allCols, 'TOTAL'];
   const prodRows = products.map(product => {
@@ -114,6 +146,11 @@ export function generateDailyPDF(
   grandRow.push(grandTotal);
   prodRows.push(grandRow);
 
+  // Smaller font for Cutting Team 2 (more products)
+  const prodFontSize = team === 2 ? 5 : 6;
+  const prodPadding = team === 2 ? 0.5 : 1;
+  const prodNameWidth = team === 2 ? 28 : 26;
+
   autoTable(doc, {
     startY: y,
     head: [prodHeaders],
@@ -122,18 +159,18 @@ export function generateDailyPDF(
     headStyles: {
       fillColor: HEADER_BG,
       textColor: HEADER_TEXT,
-      fontSize: 6,
+      fontSize: prodFontSize,
       fontStyle: 'bold',
       halign: 'center',
-      cellPadding: 1,
+      cellPadding: prodPadding,
     },
     bodyStyles: {
-      fontSize: 6,
+      fontSize: prodFontSize,
       halign: 'center',
-      cellPadding: 1,
+      cellPadding: prodPadding,
     },
     columnStyles: {
-      0: { halign: 'left', fontStyle: 'bold', cellWidth: 26 },
+      0: { halign: 'left', fontStyle: 'bold', cellWidth: prodNameWidth },
     },
     styles: {
       lineColor: [200, 200, 200],
@@ -152,76 +189,146 @@ export function generateDailyPDF(
     },
   });
 
-  // --- Materials Table (compact, below production) ---
-  y = (doc as any).lastAutoTable.finalY + 5;
+  // --- Materials Section ---
+  y = (doc as any).lastAutoTable.finalY + 3;
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...PRIMARY_COLOR);
   doc.text('Raw Materials', 10, y);
-  y += 3;
+  y += 2;
 
-  const matHeaders = ['Material', 'Initial Stock', 'Using', 'Final'];
-  const matRows: (string | number)[][] = [];
+  if (team === 2) {
+    // 2-column layout: 8-column single table
+    const twoColRows = buildTwoColMatRows(categories, materials);
+    const twoColHeaders = ['Material', 'Initial', 'Using', 'Final', 'Material', 'Initial', 'Using', 'Final'];
+    const colW = 17;
+    const nameW = 52;
 
-  for (const cat of categories) {
-    matRows.push([cat.name, '', '', '']);
-    for (const item of cat.items) {
-      const mat = materials[item] || { initial: 0, using: 0 };
-      const final_val = mat.initial - mat.using;
-      matRows.push([`  ${item}`, mat.initial, mat.using, final_val]);
-    }
-  }
-
-  autoTable(doc, {
-    startY: y,
-    head: [matHeaders],
-    body: matRows,
-    theme: 'grid',
-    headStyles: {
-      fillColor: HEADER_BG,
-      textColor: HEADER_TEXT,
-      fontSize: 6,
-      fontStyle: 'bold',
-      halign: 'center',
-      cellPadding: 1,
-    },
-    bodyStyles: {
-      fontSize: 6,
-      halign: 'center',
-      cellPadding: 1,
-    },
-    columnStyles: {
-      0: { halign: 'left', cellWidth: 55 },
-      1: { cellWidth: 25 },
-      2: { cellWidth: 25 },
-      3: { cellWidth: 25 },
-    },
-    styles: {
-      lineColor: [200, 200, 200],
-      lineWidth: 0.15,
-    },
-    margin: { left: 10, right: 10 },
-    tableWidth: 130,
-    didParseCell: (data: any) => {
-      if (data.section === 'body') {
-        const rowData = matRows[data.row.index];
-        if (rowData && rowData[1] === '' && rowData[2] === '' && rowData[3] === '') {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [232, 245, 233];
-          data.cell.styles.textColor = [46, 125, 50];
-        }
-        if (data.column.index === 3 && typeof rowData?.[3] === 'number') {
-          data.cell.styles.fontStyle = 'bold';
-          if ((rowData[3] as number) < 0) {
-            data.cell.styles.textColor = [211, 47, 47];
-          } else {
-            data.cell.styles.textColor = [46, 125, 50];
+    autoTable(doc, {
+      startY: y,
+      head: [twoColHeaders],
+      body: twoColRows,
+      theme: 'grid',
+      headStyles: {
+        fillColor: HEADER_BG,
+        textColor: HEADER_TEXT,
+        fontSize: 4,
+        fontStyle: 'bold',
+        halign: 'center',
+        cellPadding: 0.4,
+      },
+      bodyStyles: {
+        fontSize: 4,
+        halign: 'center',
+        cellPadding: 0.4,
+      },
+      columnStyles: {
+        0: { halign: 'left', cellWidth: nameW },
+        1: { cellWidth: colW },
+        2: { cellWidth: colW },
+        3: { cellWidth: colW },
+        4: { halign: 'left', cellWidth: nameW },
+        5: { cellWidth: colW },
+        6: { cellWidth: colW },
+        7: { cellWidth: colW },
+      },
+      styles: {
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1,
+        overflow: 'hidden',
+      },
+      margin: { left: 10, right: 10 },
+      didParseCell: (data: any) => {
+        if (data.section === 'body') {
+          const rowData = twoColRows[data.row.index];
+          if (!rowData) return;
+          // Left half (cols 0-3)
+          if (data.column.index <= 3) {
+            const leftVals = rowData.slice(0, 4);
+            if (isCategoryRow(leftVals as (string|number)[])) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [232, 245, 233];
+              data.cell.styles.textColor = [46, 125, 50];
+            }
+            if (data.column.index === 3 && typeof leftVals[3] === 'number') {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.textColor = (leftVals[3] as number) < 0 ? [211, 47, 47] : [46, 125, 50];
+            }
+          }
+          // Right half (cols 4-7)
+          if (data.column.index >= 4) {
+            const rightVals = rowData.slice(4, 8);
+            if (isCategoryRow(rightVals as (string|number)[])) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [232, 245, 233];
+              data.cell.styles.textColor = [46, 125, 50];
+            }
+            if (data.column.index === 7 && typeof rightVals[3] === 'number') {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.textColor = (rightVals[3] as number) < 0 ? [211, 47, 47] : [46, 125, 50];
+            }
+          }
+          // Separator between left and right
+          if (data.column.index === 4) {
+            data.cell.styles.cellPadding = { top: 0.4, bottom: 0.4, left: 1.5, right: 0.4 };
           }
         }
-      }
-    },
-  });
+      },
+    });
+  } else {
+    // Team 1: single column (fewer materials)
+    const allMatRows = buildMatRows(categories, materials);
+    autoTable(doc, {
+      startY: y,
+      head: [['Material', 'Initial', 'Using', 'Final']],
+      body: allMatRows,
+      theme: 'grid',
+      headStyles: {
+        fillColor: HEADER_BG,
+        textColor: HEADER_TEXT,
+        fontSize: 5.5,
+        fontStyle: 'bold',
+        halign: 'center',
+        cellPadding: 0.8,
+      },
+      bodyStyles: {
+        fontSize: 5.5,
+        halign: 'center',
+        cellPadding: 0.8,
+      },
+      columnStyles: {
+        0: { halign: 'left', cellWidth: 55 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 22 },
+      },
+      styles: {
+        lineColor: [200, 200, 200],
+        lineWidth: 0.15,
+      },
+      margin: { left: 10, right: 10 },
+      tableWidth: 121,
+      didParseCell: (data: any) => {
+        if (data.section === 'body') {
+          const rowData = allMatRows[data.row.index];
+          if (rowData && rowData[1] === '' && rowData[2] === '' && rowData[3] === '') {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [232, 245, 233];
+            data.cell.styles.textColor = [46, 125, 50];
+          }
+          if (data.column.index === 3 && typeof rowData?.[3] === 'number') {
+            data.cell.styles.fontStyle = 'bold';
+            if ((rowData[3] as number) < 0) {
+              data.cell.styles.textColor = [211, 47, 47];
+            } else {
+              data.cell.styles.textColor = [46, 125, 50];
+            }
+          }
+        }
+      },
+    });
+  }
 
   addFooter(doc);
 
@@ -308,6 +415,10 @@ export function generateMonthlySummaryPDF(
   grandRow.push(grandTotal);
   bodyRows.push(grandRow);
 
+  const summaryFontSize = team === 2 ? 4.5 : 5;
+  const summaryPadding = team === 2 ? 0.6 : 0.8;
+  const summaryNameWidth = team === 2 ? 30 : 28;
+
   autoTable(doc, {
     startY: y,
     head: [headers],
@@ -316,19 +427,19 @@ export function generateMonthlySummaryPDF(
     headStyles: {
       fillColor: HEADER_BG,
       textColor: HEADER_TEXT,
-      fontSize: 5,
+      fontSize: summaryFontSize,
       fontStyle: 'bold',
       halign: 'center',
-      cellPadding: 0.8,
+      cellPadding: summaryPadding,
     },
     bodyStyles: {
-      fontSize: 5,
+      fontSize: summaryFontSize,
       halign: 'center',
-      cellPadding: 0.8,
+      cellPadding: summaryPadding,
     },
     columnStyles: {
-      0: { halign: 'left', fontStyle: 'bold', cellWidth: 28 },
-      [headers.length - 1]: { fontStyle: 'bold', cellWidth: 16 },
+      0: { halign: 'left', fontStyle: 'bold', cellWidth: summaryNameWidth },
+      [headers.length - 1]: { fontStyle: 'bold', cellWidth: 14 },
     },
     styles: {
       lineColor: [200, 200, 200],
@@ -344,7 +455,7 @@ export function generateMonthlySummaryPDF(
         if (label.startsWith('↳')) {
           data.cell.styles.fillColor = [232, 245, 233];
           data.cell.styles.textColor = [46, 125, 50];
-          data.cell.styles.fontSize = 4.5;
+          data.cell.styles.fontSize = 4;
           data.cell.styles.fontStyle = 'italic';
         }
 
