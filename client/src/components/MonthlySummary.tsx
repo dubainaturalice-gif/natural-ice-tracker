@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
 import { TEAM1_PRODUCTS, TEAM2_PRODUCTS } from '../utils/data';
 import * as api from '../api';
+import { generateMonthlySummaryPDF } from '../utils/pdf';
 
 const PALLET_RATES: Record<string, number> = {
   '1kg Tube': 60,
@@ -86,6 +87,14 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ onBack }) => {
           <ArrowLeft size={18} />
         </button>
         <h2 className="text-lg font-bold text-base-content flex-1">Monthly Summary</h2>
+        <button
+          className="btn btn-sm btn-accent gap-1"
+          onClick={() => generateMonthlySummaryPDF(year, month, activeTeam, shiftFilter, summaryData)}
+          title="Download Monthly PDF"
+        >
+          <FileDown size={14} />
+          PDF
+        </button>
       </div>
 
       {/* Controls */}
