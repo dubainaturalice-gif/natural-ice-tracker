@@ -67,4 +67,19 @@ router.post('/', (req, res) => {
   }
 });
 
+// Reset daily materials data
+router.delete('/reset', (req, res) => {
+  const { date } = req.query;
+  if (!date) {
+    return res.status(400).json({ error: 'date is required' });
+  }
+
+  try {
+    const result = db.prepare('DELETE FROM materials WHERE date = ?').run(date);
+    res.json({ success: true, deleted: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset materials data' });
+  }
+});
+
 module.exports = router;
