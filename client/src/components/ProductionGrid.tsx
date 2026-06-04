@@ -8,9 +8,10 @@ interface ProductionGridProps {
   shift: string;
   team: number;
   userRole: string;
+  onDataChange?: (data: Record<string, Record<string, number>>) => void;
 }
 
-export const ProductionGrid: React.FC<ProductionGridProps> = ({ date, shift, team, userRole }) => {
+export const ProductionGrid: React.FC<ProductionGridProps> = ({ date, shift, team, userRole, onDataChange }) => {
   const products = team === 1 ? TEAM1_PRODUCTS : TEAM2_PRODUCTS;
   const hours = shift === 'M' ? MORNING_HOURS : NIGHT_HOURS;
   const allCols = [...hours, 'DISPATCH'];
@@ -58,6 +59,7 @@ export const ProductionGrid: React.FC<ProductionGridProps> = ({ date, shift, tea
       }
       setLockedCells(locked);
       setGrid(newGrid);
+      onDataChange?.(newGrid);
     } catch (err) {
       console.error('Failed to load production data:', err);
       const newGrid: Record<string, Record<string, number>> = {};
@@ -117,10 +119,11 @@ export const ProductionGrid: React.FC<ProductionGridProps> = ({ date, shift, tea
       saveTimerRef.current = setTimeout(() => {
         saveBatch(updated);
       }, 2000);
+      onDataChange?.(updated);
       return updated;
     });
     setDirty(true);
-  }, [saveBatch]);
+  }, [saveBatch, onDataChange]);
 
   const saveAll = async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
