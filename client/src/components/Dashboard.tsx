@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, BarChart3, Users, Sun, Moon, LogOut } from 'lucide-react';
+import { ClipboardList, BarChart3, Users, Sun, Moon, LogOut, RotateCcw } from 'lucide-react';
 import { User, Page } from '../types';
 import * as api from '../api';
 
@@ -11,6 +11,9 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onLogout }) => {
   const [todayStats, setTodayStats] = useState({ morningTotal: 0, nightTotal: 0 });
+  const [resetDate, setResetDate] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
@@ -24,6 +27,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onLogout
     } catch (err) {
       console.error('Failed to load stats:', err);
     }
+  };
+
+  const handleResetDaily = async () => {
+    if (!resetDate) return;
+    setResetting(true);
+    try {
+      await api.resetDaily(resetDate);
+      setShowResetConfirm(false);
+      setResetDate('');
+      loadStats();
+    } catch (err) {
+      console.error('Failed to reset:', err);
+    }
+    setResetting(false);
   };
 
   const currentHour = new Date().getHours();
@@ -111,15 +128,57 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onLogout
           Monthly Summary
         </button>
         {user.role === 'admin' && (
-          <button
-            className="btn btn-outline btn-lg justify-start gap-3"
-            onClick={() => onNavigate('user-management')}
-          >
-            <Users size={22} />
-            Manage Users
-          </button>
+          <>
+            <button
+              className="btn btn-outline btn-lg justify-start gap-3"
+              onClick={() => onNavigate('user-management')}
+            >
+              <Users size={22} />
+              Manage Users
+            </button>
+            <button
+              className="btn btn-error btn-outline btn-lg justify-start gap-3"
+              onClick={() => { setResetDate(today); setShowResetConfirm(true); }}
+            >
+              <RotateCcw size={22} />
+              Reset Daily Data
+            </button>
+          </>
         )}
       </div>
+
+      {/* Reset Daily Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card bg-base-100 shadow-xl w-full max-w-sm">
+            <div className="card-body">
+              <h3 className="card-title text-error">⚠️ Reset Daily Data</h3>
+              <p className="text-base-content/70 text-sm">
+                This will permanently delete <strong>all production and materials data</strong> for the selected date. This also removes the data from the Monthly Summary.
+              </p>
+              <div className="form-control mt-2">
+                <label className="label"><span className="label-text">Select date to reset</span></label>
+                <input
+                  type="date"
+                  className="input input-bordered"
+                  value={resetDate}
+                  onChange={(e) => setResetDate(e.target.value)}
+                />
+              </div>
+              <div className="card-actions justify-end mt-4">
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowResetConfirm(false)}>Cancel</button>
+                <button
+                  className="btn btn-error btn-sm"
+                  onClick={handleResetDaily}
+                  disabled={!resetDate || resetting}
+                >
+                  {resetting ? 'Resetting...' : 'Reset Data'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
