@@ -8,6 +8,7 @@ interface MaterialsFormProps {
   shift: string;
   team: number;
   userRole?: string;
+  onDataChange?: (data: Record<string, { initial: number; using: number }>) => void;
 }
 
 interface MatRow {
@@ -16,7 +17,7 @@ interface MatRow {
   initialFromPrev: boolean;
 }
 
-export const MaterialsForm: React.FC<MaterialsFormProps> = ({ date, shift, team, userRole }) => {
+export const MaterialsForm: React.FC<MaterialsFormProps> = ({ date, shift, team, userRole, onDataChange }) => {
   const isAdmin = userRole === 'admin' || userRole === 'manager';
   const categories: MaterialCategory[] = team === 1 ? TEAM1_MATERIALS : TEAM2_MATERIALS;
   const allItems = categories.flatMap(c => c.items);
@@ -82,6 +83,14 @@ export const MaterialsForm: React.FC<MaterialsFormProps> = ({ date, shift, team,
       }
 
       setValues(currentData);
+      // Expose data for PDF export
+      if (onDataChange) {
+        const exportData: Record<string, { initial: number; using: number }> = {};
+        for (const key of Object.keys(currentData)) {
+          exportData[key] = { initial: currentData[key].initial, using: currentData[key].using };
+        }
+        onDataChange(exportData);
+      }
     } catch (err) {
       console.error('Failed to load materials:', err);
       const empty: Record<string, MatRow> = {};
@@ -124,10 +133,18 @@ export const MaterialsForm: React.FC<MaterialsFormProps> = ({ date, shift, team,
       saveTimerRef.current = setTimeout(() => {
         saveBatch(updated);
       }, 2000);
+      // Expose data for PDF export
+      if (onDataChange) {
+        const exportData: Record<string, { initial: number; using: number }> = {};
+        for (const key of Object.keys(updated)) {
+          exportData[key] = { initial: updated[key].initial, using: updated[key].using };
+        }
+        onDataChange(exportData);
+      }
       return updated;
     });
     setDirty(true);
-  }, [saveBatch]);
+  }, [saveBatch, onDataChange]);
 
   const saveAll = async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
