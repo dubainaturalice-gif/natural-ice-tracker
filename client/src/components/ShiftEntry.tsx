@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Sun, Moon } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { ArrowLeft, Sun, Moon, FileDown } from 'lucide-react';
 import { User } from '../types';
 import { ProductionGrid } from './ProductionGrid';
 import { MaterialsForm } from './MaterialsForm';
+import { generateDailyPDF } from '../utils/pdf';
 
 interface ShiftEntryProps {
   user: User;
@@ -22,6 +23,22 @@ export const ShiftEntry: React.FC<ShiftEntryProps> = ({ user, onBack }) => {
   const canChangeTeam = user.role === 'admin' || user.role === 'manager';
   const canChangeShift = user.role === 'admin' || user.role === 'manager';
 
+  // Refs for grid/materials data
+  const gridDataRef = useRef<Record<string, Record<string, number>>>({});
+  const materialsDataRef = useRef<Record<string, { initial: number; using: number }>>({});
+
+  const handleGridDataChange = useCallback((data: Record<string, Record<string, number>>) => {
+    gridDataRef.current = data;
+  }, []);
+
+  const handleMaterialsDataChange = useCallback((data: Record<string, { initial: number; using: number }>) => {
+    materialsDataRef.current = data;
+  }, []);
+
+  const handleExportPDF = () => {
+    generateDailyPDF(date, shift, activeTeam, gridDataRef.current, materialsDataRef.current);
+  };
+
   return (
     <div className="min-h-screen bg-base-100 p-3">
       {/* Header */}
@@ -30,6 +47,10 @@ export const ShiftEntry: React.FC<ShiftEntryProps> = ({ user, onBack }) => {
           <ArrowLeft size={18} />
         </button>
         <h2 className="text-lg font-bold text-base-content flex-1">Shift Production Entry</h2>
+        <button className="btn btn-sm btn-accent gap-1" onClick={handleExportPDF} title="Download PDF Report">
+          <FileDown size={14} />
+          PDF
+        </button>
       </div>
 
       {/* Controls */}
@@ -94,9 +115,9 @@ export const ShiftEntry: React.FC<ShiftEntryProps> = ({ user, onBack }) => {
 
       {/* Content */}
       {activeTab === 'production' ? (
-        <ProductionGrid date={date} shift={shift} team={activeTeam} userRole={user.role} />
+        <ProductionGrid date={date} shift={shift} team={activeTeam} userRole={user.role} onDataChange={handleGridDataChange} />
       ) : (
-        <MaterialsForm date={date} shift={shift} team={activeTeam} userRole={user.role} />
+        <MaterialsForm date={date} shift={shift} team={activeTeam} userRole={user.role} onDataChange={handleMaterialsDataChange} />
       )}
     </div>
   );
