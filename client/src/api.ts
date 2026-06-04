@@ -116,6 +116,13 @@ export async function getProductionStats(date: string): Promise<{ morningTotal: 
   return request(`/production/stats?date=${date}`);
 }
 
+// Reset Daily
+export async function resetDaily(date: string): Promise<{ productionDeleted: number; materialsDeleted: number }> {
+  const prod = await request<{ deleted: number }>(`/production/reset?date=${date}`, { method: 'DELETE' });
+  const mat = await request<{ deleted: number }>(`/materials/reset?date=${date}`, { method: 'DELETE' });
+  return { productionDeleted: prod.deleted, materialsDeleted: mat.deleted };
+}
+
 // Materials
 export async function getMaterials(date: string, shift: string, team: number): Promise<Array<{ material: string; initial_stock: number; using_qty: number }>> {
   return request(`/materials?date=${date}&shift=${shift}&team=${team}`);
