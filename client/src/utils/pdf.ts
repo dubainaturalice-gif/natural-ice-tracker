@@ -20,30 +20,28 @@ function teamLabel(team: number): string {
   return team === 1 ? 'Production Team 1' : 'Cutting Team 2';
 }
 
-function addHeader(doc: jsPDF, title: string, subtitle: string) {
-  // Blue header bar
+function addCompactHeader(doc: jsPDF, title: string, subtitle: string): number {
+  const w = doc.internal.pageSize.getWidth();
+  // Compact blue header bar
   doc.setFillColor(...PRIMARY_COLOR);
-  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 28, 'F');
-
+  doc.rect(0, 0, w, 18, 'F');
   // Green accent line
   doc.setFillColor(...GREEN_COLOR);
-  doc.rect(0, 28, doc.internal.pageSize.getWidth(), 3, 'F');
+  doc.rect(0, 18, w, 2, 'F');
 
   // Title
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Natural Ice Production Tracker', 14, 12);
+  doc.text('Natural Ice Production Tracker', 10, 8);
 
-  // Subtitle
-  doc.setFontSize(10);
+  // Subtitle line
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(title, 14, 19);
-  doc.text(subtitle, 14, 25);
+  doc.text(`${title}  —  ${subtitle}`, 10, 15);
 
-  // Reset
   doc.setTextColor(0, 0, 0);
-  return 38; // y position after header
+  return 24; // y after header
 }
 
 function addFooter(doc: jsPDF) {
@@ -53,21 +51,20 @@ function addFooter(doc: jsPDF) {
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Footer line
     doc.setDrawColor(...PRIMARY_COLOR);
-    doc.setLineWidth(0.5);
-    doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+    doc.setLineWidth(0.3);
+    doc.line(10, pageHeight - 10, pageWidth - 10, pageHeight - 10);
 
-    doc.setFontSize(8);
+    doc.setFontSize(6.5);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, pageHeight - 10);
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-    doc.text('Natural Ice Production Tracker', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 10, pageHeight - 6);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 10, pageHeight - 6, { align: 'right' });
+    doc.text('Natural Ice Production Tracker', pageWidth / 2, pageHeight - 6, { align: 'center' });
   }
 }
 
 // ============================
-// DAILY PRODUCTION PDF
+// DAILY PRODUCTION PDF — ALL ON ONE PAGE
 // ============================
 export function generateDailyPDF(
   date: string,
@@ -84,14 +81,14 @@ export function generateDailyPDF(
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   const subtitle = `${formatDate(date)}  |  ${shiftLabel(shift)}  |  ${teamLabel(team)}`;
-  let y = addHeader(doc, 'Daily Production Report', subtitle);
+  let y = addCompactHeader(doc, 'Daily Production Report', subtitle);
 
   // --- Production Table ---
-  doc.setFontSize(12);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...PRIMARY_COLOR);
-  doc.text('Production Data', 14, y);
-  y += 5;
+  doc.text('Production Data', 10, y);
+  y += 3;
 
   const prodHeaders = ['Product', ...allCols, 'TOTAL'];
   const prodRows = products.map(product => {
@@ -106,7 +103,7 @@ export function generateDailyPDF(
     return row;
   });
 
-  // Grand total row
+  // Total row
   const grandRow: (string | number)[] = ['TOTAL'];
   let grandTotal = 0;
   for (const h of allCols) {
@@ -125,29 +122,29 @@ export function generateDailyPDF(
     headStyles: {
       fillColor: HEADER_BG,
       textColor: HEADER_TEXT,
-      fontSize: 7,
+      fontSize: 6,
       fontStyle: 'bold',
       halign: 'center',
+      cellPadding: 1,
     },
     bodyStyles: {
-      fontSize: 7,
+      fontSize: 6,
       halign: 'center',
-      cellPadding: 1.5,
+      cellPadding: 1,
     },
     columnStyles: {
-      0: { halign: 'left', fontStyle: 'bold', cellWidth: 30 },
+      0: { halign: 'left', fontStyle: 'bold', cellWidth: 26 },
     },
     styles: {
       lineColor: [200, 200, 200],
-      lineWidth: 0.2,
+      lineWidth: 0.15,
     },
+    margin: { left: 10, right: 10 },
     didParseCell: (data: any) => {
-      // Style the total row
       if (data.row.index === prodRows.length - 1) {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fillColor = [240, 248, 255];
       }
-      // Style TOTAL column
       if (data.column.index === prodHeaders.length - 1 && data.section === 'body') {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.textColor = PRIMARY_COLOR;
@@ -155,31 +152,24 @@ export function generateDailyPDF(
     },
   });
 
-  // --- Materials Table ---
-  y = (doc as any).lastAutoTable.finalY + 10;
+  // --- Materials Table (compact, below production) ---
+  y = (doc as any).lastAutoTable.finalY + 5;
 
-  // Check if we need a new page
-  if (y > doc.internal.pageSize.getHeight() - 40) {
-    doc.addPage();
-    y = 15;
-  }
-
-  doc.setFontSize(12);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...PRIMARY_COLOR);
-  doc.text('Raw Materials', 14, y);
-  y += 5;
+  doc.text('Raw Materials', 10, y);
+  y += 3;
 
   const matHeaders = ['Material', 'Initial Stock', 'Using', 'Final'];
   const matRows: (string | number)[][] = [];
 
   for (const cat of categories) {
-    // Category header row
     matRows.push([cat.name, '', '', '']);
     for (const item of cat.items) {
       const mat = materials[item] || { initial: 0, using: 0 };
       const final_val = mat.initial - mat.using;
-      matRows.push([`   ${item}`, mat.initial, mat.using, final_val]);
+      matRows.push([`  ${item}`, mat.initial, mat.using, final_val]);
     }
   }
 
@@ -191,27 +181,29 @@ export function generateDailyPDF(
     headStyles: {
       fillColor: HEADER_BG,
       textColor: HEADER_TEXT,
-      fontSize: 8,
+      fontSize: 6,
       fontStyle: 'bold',
       halign: 'center',
+      cellPadding: 1,
     },
     bodyStyles: {
-      fontSize: 7,
+      fontSize: 6,
       halign: 'center',
-      cellPadding: 1.5,
+      cellPadding: 1,
     },
     columnStyles: {
-      0: { halign: 'left', cellWidth: 70 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 30 },
+      0: { halign: 'left', cellWidth: 55 },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 25 },
+      3: { cellWidth: 25 },
     },
     styles: {
       lineColor: [200, 200, 200],
-      lineWidth: 0.2,
+      lineWidth: 0.15,
     },
+    margin: { left: 10, right: 10 },
+    tableWidth: 130,
     didParseCell: (data: any) => {
-      // Style category header rows
       if (data.section === 'body') {
         const rowData = matRows[data.row.index];
         if (rowData && rowData[1] === '' && rowData[2] === '' && rowData[3] === '') {
@@ -219,13 +211,12 @@ export function generateDailyPDF(
           data.cell.styles.fillColor = [232, 245, 233];
           data.cell.styles.textColor = [46, 125, 50];
         }
-        // Final column coloring
         if (data.column.index === 3 && typeof rowData?.[3] === 'number') {
           data.cell.styles.fontStyle = 'bold';
           if ((rowData[3] as number) < 0) {
-            data.cell.styles.textColor = [211, 47, 47]; // red
+            data.cell.styles.textColor = [211, 47, 47];
           } else {
-            data.cell.styles.textColor = [46, 125, 50]; // green
+            data.cell.styles.textColor = [46, 125, 50];
           }
         }
       }
@@ -239,7 +230,7 @@ export function generateDailyPDF(
 }
 
 // ============================
-// MONTHLY SUMMARY PDF
+// MONTHLY SUMMARY PDF — COMPACT ONE PAGE
 // ============================
 const PALLET_RATES: Record<string, number> = {
   '1kg Tube': 60,
@@ -270,24 +261,17 @@ export function generateMonthlySummaryPDF(
       .reduce((sum, d) => sum + d.total, 0);
   };
 
-  const getProductMonthTotal = (product: string): number => {
-    return summaryData
-      .filter(d => d.product === product && d.team === team && matchesShift(d))
-      .reduce((sum, d) => sum + d.total, 0);
-  };
-
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   const shiftLabel2 = shiftFilter === 'all' ? 'All Shifts' : shiftFilter === 'M' ? 'Morning Shift ☀' : 'Night Shift ☽';
   const subtitle = `${monthName}  |  ${teamLabel(team)}  |  ${shiftLabel2}`;
-  let y = addHeader(doc, 'Monthly Production Summary', subtitle);
+  let y = addCompactHeader(doc, 'Monthly Production Summary', subtitle);
 
   // Build table
   const headers = ['Product', ...days.map(d => String(d)), 'TOTAL'];
   const bodyRows: (string | number)[][] = [];
 
   for (const product of products) {
-    // Quantity row
     const row: (string | number)[] = [product];
     let monthTotal = 0;
     for (const d of days) {
@@ -324,8 +308,6 @@ export function generateMonthlySummaryPDF(
   grandRow.push(grandTotal);
   bodyRows.push(grandRow);
 
-  const dayColWidth = (297 - 14 * 2 - 30 - 18) / daysInMonth;
-
   autoTable(doc, {
     startY: y,
     head: [headers],
@@ -334,46 +316,44 @@ export function generateMonthlySummaryPDF(
     headStyles: {
       fillColor: HEADER_BG,
       textColor: HEADER_TEXT,
-      fontSize: 5.5,
+      fontSize: 5,
       fontStyle: 'bold',
       halign: 'center',
-      cellPadding: 1,
+      cellPadding: 0.8,
     },
     bodyStyles: {
-      fontSize: 5.5,
+      fontSize: 5,
       halign: 'center',
-      cellPadding: 1,
+      cellPadding: 0.8,
     },
     columnStyles: {
-      0: { halign: 'left', fontStyle: 'bold', cellWidth: 30 },
-      [headers.length - 1]: { fontStyle: 'bold', cellWidth: 18 },
+      0: { halign: 'left', fontStyle: 'bold', cellWidth: 28 },
+      [headers.length - 1]: { fontStyle: 'bold', cellWidth: 16 },
     },
     styles: {
       lineColor: [200, 200, 200],
-      lineWidth: 0.15,
+      lineWidth: 0.1,
       overflow: 'hidden',
     },
+    margin: { left: 10, right: 10 },
     didParseCell: (data: any) => {
       if (data.section === 'body') {
         const rowData = bodyRows[data.row.index];
         const label = String(rowData?.[0] || '');
 
-        // Pallet sub-rows
         if (label.startsWith('↳')) {
           data.cell.styles.fillColor = [232, 245, 233];
           data.cell.styles.textColor = [46, 125, 50];
-          data.cell.styles.fontSize = 5;
+          data.cell.styles.fontSize = 4.5;
           data.cell.styles.fontStyle = 'italic';
         }
 
-        // Grand total row
         if (data.row.index === bodyRows.length - 1) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fillColor = [240, 248, 255];
           data.cell.styles.textColor = PRIMARY_COLOR;
         }
 
-        // TOTAL column
         if (data.column.index === headers.length - 1) {
           data.cell.styles.fontStyle = 'bold';
           if (!label.startsWith('↳') && data.row.index !== bodyRows.length - 1) {
@@ -382,7 +362,6 @@ export function generateMonthlySummaryPDF(
         }
       }
     },
-    margin: { left: 14, right: 14 },
   });
 
   addFooter(doc);
